@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<launch>
+
+  <rosparam param="/vive/world_offset">[0, 0, 1.265]</rosparam>
+  <rosparam param="/vive/world_yaw">0.0</rosparam>
+
+  <node name="vive_node" pkg="vive_ros" type="vive_node" launch-prefix="$(find vive_ros)/scripts/find_steam_runtime.sh" output="screen" required="true"/>
+
+
+  <arg
+    name="model" />
+  <arg
+    name="gui"
+    default="False" />    
+  <param
+    name="robot_description"
+    textfile="$(find aubo_description)/urdf/aubo_i3_3R.urdf" />    
+
+  <param
+    name="use_gui"
+    value="$(arg gui)" />
+
+  <node
+    name="robot_state_publisher"
+    pkg="robot_state_publisher"
+    type="robot_state_publisher" />
+  <node
+    name="rviz"
+    pkg="rviz"
+    type="rviz"
+    args="-d $(find aubo_description)/urdf/urdf.rviz" />
+  <node
+   name="talker"
+   pkg="vive_ros"
+   type="talker_robot.py"/>
+
+</launch>
+

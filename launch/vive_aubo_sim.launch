@@ -1,0 +1,72 @@
+<?xml version="1.0"?>
+<launch>
+
+  <rosparam param="/vive/world_offset">[0, 0, 1.265]</rosparam>
+  <rosparam param="/vive/world_yaw">0.0</rosparam>
+
+  <node name="vive_node" pkg="vive_ros" type="vive_node" launch-prefix="$(find vive_ros)/scripts/find_steam_runtime.sh" output="screen" required="true"/>
+
+  <arg
+    name="model" />
+  <arg
+    name="gui"
+    default="True" />    
+    
+  <!--param
+    name="robot_description"
+    textfile="$(find aubo_description)/urdf/aubo_i3_3R.urdf" /-->  
+    
+  <group ns = "robot1">    
+    <param
+      name="robot_description"
+      textfile="$(find aubo_description)/urdf/aubo_i3_3R.urdf" />
+    <param
+      name="use_gui"
+      value="$(arg gui)" />
+    <!--node
+      name="ik_solvers"
+      pkg="ik_solvers"
+      type="aubo_iksolver_3r" /-->
+    
+
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" >
+      <param name="publish_frequency" type="double" value="50.0" />
+      <param name="tf_prefix" value="robot1" />
+      
+    </node>
+  </group>
+
+  <group ns = "robot2">
+    
+    <param
+      name="robot_description"
+      textfile="$(find aubo_description)/urdf/aubo_i3_3R.urdf" />
+    <param
+      name="use_gui"
+      value="$(arg gui)" />
+   
+    <!--node
+      name="ik_solvers"
+      pkg="ik_solvers"
+      type="ur_iksolver" /-->
+    
+    <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" >
+      <param name="publish_frequency" type="double" value="50.0" />
+      <param name="tf_prefix" value="robot2" />
+      
+    </node>
+  </group>
+  <node pkg="tf" type="static_transform_publisher" name="robot1_broadcaster" args="0 0 0 0 0 0 1 world robot1/world 100" />
+  <node pkg="tf" type="static_transform_publisher" name="robot2_broadcaster" args="0 0 0 0 0 0 1 world robot2/world 100" />
+  <node
+    name="rviz"
+    pkg="rviz"
+    type="rviz"
+    args="-d $(find aubo_description)/urdf/aubo_rm_control.rviz" />
+    
+  <node
+   name="talker"
+   pkg="vive_ros"
+   type="talker.py"/>
+
+</launch>
