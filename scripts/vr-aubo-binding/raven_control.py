@@ -46,6 +46,7 @@ import tf2_ros
 import numpy as np
 
 import os
+import time
 from absl import app
 from absl import flags
 
@@ -58,8 +59,11 @@ from pyquaternion import Quaternion
 
 #import sensor_msgs.msg
 from sensor_msgs.msg import Joy
+from sensor_msgs.msg import JointState
 
 import threading 
+import PyKDL as kdl
+
 
 
 flags.DEFINE_string('assets_root', '.', '')
@@ -128,30 +132,111 @@ class ViveRobotBridge:
         self.vive_controller_rotation[2] = msg.rotation.z
         self.vive_controller_rotation[3] = msg.rotation.w
 
+class RobotControlInterface:
+    def __init__(self, env):
+        self.joint_states = [0,0,0,0,0,0]
+        self.ik_result_sub = rospy.Subscriber(
+            '/joint_states', 
+            JointState, 
+            self.ik_result_callback,
+            queue_size=1)
+        self.ee_tarpos_pub = rospy.Publisher(
+            'ee_tarpos', 
+            geometry_msgs.msg.Transform,
+            queue_size=1)
 
+        self.joint_state_pub = rospy.Publisher(
+            'joint_states', 
+            JointState,
+            queue_size=1)
+
+        self.env = env
+
+    def ik_result_callback(self, msg):
+        """joint states of external ik solver"""
+        self.joint_states = msg.position
+        self.movej_fast(self.joint_states)
+        
+    def movej_fast(self, targj):
+        
+        gains = np.ones(len(self.env.joints))
+        p.setJointMotorControlArray(
+            bodyIndex=self.env.ur5,
+            jointIndices=self.env.joints,
+            controlMode=p.POSITION_CONTROL,
+            targetPositions=targj,
+            positionGains=gains)
+        p.stepSimulation()
+
+    def publish_pose_message(self, pose):
+        msg = geometry_msgs.msg.Transform()    
+
+        position = pose[0]
+        orientation = pose[1]
+        msg.translation.x = position[0]
+        msg.translation.y = position[1]
+        msg.translation.z = position[2]
+
+        msg.rotation.x = orientation[0]
+        msg.rotation.y = orientation[1]
+        msg.rotation.z = orientation[2]
+        msg.rotation.w = orientation[3]
+        print(msg)
+
+        self.ee_tarpos_pub.publish(msg)
+
+    def solve_ik(self, pose):
+        """Calculate joint configuration with inverse kinematics."""
+        joints = p.calculateInverseKinematics(
+            bodyUniqueId=self.env.ur5,
+            endEffectorLinkIndex=self.env.ee_tip,
+            targetPosition=pose[0],
+            targetOrientation=pose[1],
+            lowerLimits=[-3 * np.pi / 2, -2.3562, -17, -17, -17, -17],
+            upperLimits=[-np.pi / 2, 0, 17, 17, 17, 17],
+            jointRanges=[np.pi, 2.3562, 34, 34, 34, 34],  # * 6,
+            restPoses=np.float32(self.env.homej).tolist(),
+            maxNumIterations=100,
+            residualThreshold=1e-5)
+        joints = np.float32(joints)
+        joints[2:] = (joints[2:] + np.pi) % (2 * np.pi) - np.pi
+        self.joint_states = joints
+        return joints
+    
+    def publish_joint_states_msg(self):
+        joint_state_msg = JointState()
+        joint_state_msg.header.stamp = rospy.Time().now()
+        joint_state_msg.name = ['shoulder_pan_joint',
+                                'shoulder_lift_joint',
+                                'elbow_joint',
+                                'wrist_1_joint',
+                                'wrist_2_joint',
+                                'wrist_3_joint']
+        joint_state_msg.position =  self.joint_states      
+        self.joint_state_pub.publish(joint_state_msg)         
 
 
 def main(unused_argv):
     vrb = ViveRobotBridge()
-#    vrb.__init__()
+    
     
     rospy.init_node('raven_vive_teleop')
-
+     
 
     temp_flag = 0
     
     pre_position = [0,0,0]
     pre_pose = [1, 0, 0, 0]
     temp = [1, 0, 0, 0]
-
+    # same loop rate as gym environment
     rate = rospy.Rate(60.0)
     
-    limits = 0.02
     
     env = Environment(
       assets_root,
       disp=True,
       hz=60)
+    
     task = tasks.names[task_name]()
     task.mode = mode
     agent = task.oracle(env)
@@ -160,12 +245,14 @@ def main(unused_argv):
     info = None
     ee_pose = ((0.46562498807907104, -0.375, 0.3599780201911926), (0.0, 0.0, 0.0, 1.0))
     ee_position = [0.0, 0.0, 0.0]
+
+    br = tf.TransformBroadcaster()
+    rci = RobotControlInterface(env)
+
     
+
     while not rospy.is_shutdown():
-        """ print(vrb.vive_controller_translation)
-        print(vrb.offset_flag)
-        print(vrb.grasp)
-        continue """
+  
         #p.stepSimulation()
         #p.getCameraImage(480, 320)
         
@@ -181,12 +268,28 @@ def main(unused_argv):
             vrb.trigger_released_event = 0
             print("O--trigger released!\n") 
 
-        if vrb.trigger_current_status == 1:
-        
+        if vrb.trigger_current_status == 1:    
+            vive_rotation = vrb.vive_controller_rotation
+            ee_rotation = kdl.Rotation.Quaternion(vive_rotation[0],vive_rotation[1],vive_rotation[2],vive_rotation[3])
+            r1 = kdl.Rotation.RotZ(-math.pi/2)
+            ee_rotation = r1 * ee_rotation
+            ee_rotation.DoRotX(math.pi/2)
             
+            ee_rotation.DoRotZ(math.pi/2)
+
+            ee_rotation.DoRotY(math.pi)
             
-            #ee_orientation = vrb.vive_controller_rotation
-            ee_orientation = (0,0,0,1)
+            ee_orientation = ee_rotation.GetQuaternion()
+            
+            # br.sendTransform(
+            #     (0.0, 0.0, 1.0),
+            #     ee_rotation.GetQuaternion(),
+            #     rospy.Time.now(),
+            #     "transformed_controller_frame",
+            #     "world"
+            # )
+            
+            #ee_orientation = (0,0,0,1)
             ee_position[0] = ee_position_ref[0] + vrb.vive_controller_translation[1]
             ee_position[1] = ee_position_ref[1] - vrb.vive_controller_translation[0]
             # z axis limit
@@ -195,8 +298,27 @@ def main(unused_argv):
                 z_control = 0.02
             ee_position[2] = z_control
 
-            ee_pose = (tuple(ee_position), ee_orientation)
-            env.movep(ee_pose)
+            ee_pose = (tuple(ee_position), tuple(ee_orientation))
+            #env.movep(ee_pose)
+            #rci.publish_pose_message(ee_pose)
+            joint_position = rci.solve_ik(ee_pose)
+            rci.movej_fast(joint_position)
+            rci.publish_joint_states_msg()
+            #targj = env.solve_ik(ee_pose)
+            #movej(env,targj, speed=0.01)
+            #rci.movej(env,rci.joint_states)
+            # joint_state_msg = JointState()
+            # joint_state_msg.header.stamp = rospy.Time().now()
+            # joint_state_msg.name = ['shoulder_pan_joint',
+            #                         'shoulder_lift_joint',
+            #                         'elbow_joint',
+            #                         'wrist_1_joint',
+            #                         'wrist_2_joint',
+            #                         'wrist_3_joint']
+            # joint_state_msg.position =  targj      
+            # joint_state_pub.publish(joint_state_msg)         
+            # add a marker to indicate the projection of the ee on the workspace
+            
             marker_head_point = [ee_position[0], ee_position[1], 0.05]
             marker_tail_point = [ee_position[0], ee_position[1], 0.06]
             p.addUserDebugLine( marker_head_point, 
