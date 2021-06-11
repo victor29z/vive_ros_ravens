@@ -7,7 +7,6 @@ Panels:
         - /Global Options1
         - /Status1
         - /TF1
-        - /TF1/Status1
         - /TF1/Tree1
         - /RobotModel1
         - /Axes1
@@ -15,6 +14,8 @@ Panels:
         - /Axes3
         - /Axes4
         - /Axes5
+        - /Axes6
+        - /Axes7
       Splitter Ratio: 0.48230087757110596
     Tree Height: 539
   - Class: rviz/Selection
@@ -86,53 +87,55 @@ Visualization Manager:
         Expand Link Details: false
         Expand Tree: false
         Link Tree Style: Links in Alphabetic Order
-        base:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        base_link:
+        left_inner_finger:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        ee_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        forearm_link:
+        left_inner_knuckle:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        headLink:
+        left_outer_finger:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        midLink:
+        left_outer_knuckle:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        rotated_base_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-        shoulder_link:
+        right_inner_finger:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        suc_baseLink:
+        right_inner_knuckle:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        tipLink:
+        right_outer_finger:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
+        right_outer_knuckle:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        robotiq_85_base_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        tcp_link:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
         tool0:
           Alpha: 1
           Show Axes: false
@@ -141,26 +144,46 @@ Visualization Manager:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        upper_arm_link:
-          Alpha: 1
-          Show Axes: false
-          Show Trail: false
-          Value: true
         world:
           Alpha: 1
           Show Axes: false
           Show Trail: false
-        wrist_1_link:
+        xmate3_base:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        wrist_2_link:
+        xmate3_link1:
           Alpha: 1
           Show Axes: false
           Show Trail: false
           Value: true
-        wrist_3_link:
+        xmate3_link2:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        xmate3_link3:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        xmate3_link4:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        xmate3_link5:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        xmate3_link6:
+          Alpha: 1
+          Show Axes: false
+          Show Trail: false
+          Value: true
+        xmate3_link7:
           Alpha: 1
           Show Axes: false
           Show Trail: false
@@ -197,12 +220,12 @@ Visualization Manager:
       Value: true
     - Alpha: 1
       Class: rviz/Axes
-      Enabled: true
+      Enabled: false
       Length: 0.20000000298023224
       Name: Axes
       Radius: 0.009999999776482582
       Reference Frame: tool_tip
-      Value: true
+      Value: false
     - Alpha: 1
       Class: rviz/Axes
       Enabled: true
@@ -211,6 +234,22 @@ Visualization Manager:
       Radius: 0.009999999776482582
       Reference Frame: transformed_controller_frame
       Value: true
+    - Alpha: 1
+      Class: rviz/Axes
+      Enabled: true
+      Length: 0.20000000298023224
+      Name: Axes
+      Radius: 0.009999999776482582
+      Reference Frame: xmate3_link7
+      Value: true
+    - Alpha: 1
+      Class: rviz/Axes
+      Enabled: false
+      Length: 0.20000000298023224
+      Name: Axes
+      Radius: 0.009999999776482582
+      Reference Frame: tool0
+      Value: false
   Enabled: true
   Global Options:
     Background Color: 48; 48; 48
@@ -239,7 +278,7 @@ Visualization Manager:
   Views:
     Current:
       Class: rviz/Orbit
-      Distance: 4.944293975830078
+      Distance: 3.6559085845947266
       Enable Stereo Rendering:
         Stereo Eye Separation: 0.05999999865889549
         Stereo Focal Distance: 1
@@ -247,17 +286,17 @@ Visualization Manager:
         Value: false
       Field of View: 0.7853981852531433
       Focal Point:
-        X: -0.6268478035926819
-        Y: 1.8130626678466797
-        Z: 0.1054733395576477
+        X: -0.9940521121025085
+        Y: 0.9120020866394043
+        Z: 0.23567351698875427
       Focal Shape Fixed Size: true
       Focal Shape Size: 0.05000000074505806
       Invert Z Axis: false
       Name: Current View
       Near Clip Distance: 0.009999999776482582
-      Pitch: 0.11039873212575912
+      Pitch: 0.030398603528738022
       Target Frame: <Fixed Frame>
-      Yaw: 5.938588619232178
+      Yaw: 6.028585910797119
     Saved: ~
 Window Geometry:
   Displays:

@@ -1,5 +1,8 @@
 <?xml version="1.0"?>
 <launch>
+  <arg
+    name="arm"
+    default="ur5" />
 
   <rosparam param="/vive/world_offset">[0, 0, 1.265]</rosparam>
   <rosparam param="/vive/world_yaw">0.0</rosparam>
@@ -9,9 +12,12 @@
   <arg
     name="gui"
     default="False" />    
+  <!-- <param
+    name="robot_description"     -->
+    textfile="$(find ravens_ur5_description)/ur5.urdf" />      
   <param
     name="robot_description"    
-    textfile="$(find ravens_ur5_description)/ur5.urdf" />      
+    textfile="$(find xmate3_description)/urdf/xmate3_with_gripper.urdf" />      
 
   <param
     name="use_gui"

@@ -75,7 +75,8 @@ flags.DEFINE_string('mode', 'train', '')
 flags.DEFINE_integer('n', 1000, '')
 
 assets_root = "/home/robot/Downloads/ravens/ravens/environments/assets/"
-task_name = "place-red-in-green"
+#task_name = "place-red-in-green"
+task_name = "block-insertion-nofixture"
 mode = "train"
 FLAGS = flags.FLAGS
 
@@ -215,6 +216,18 @@ class RobotControlInterface:
         joint_state_msg.position =  self.joint_states      
         self.joint_state_pub.publish(joint_state_msg)         
 
+class teleop_agent:
+    def __init__(self, env) -> None:
+        self.pose = ((0.0, 0.0, 0.0),(0.0, 0.0, 0.0, 1.0))
+        self.action = None
+    def act(self,pose,grasp):
+        
+
+
+        
+
+        
+
 
 def main(unused_argv):
     vrb = ViveRobotBridge()
@@ -326,6 +339,11 @@ def main(unused_argv):
                                 lineColorRGB=[1, 0, 0], 
                                 lifeTime=0.2, 
                                 lineWidth=3)
+            if env.ee.check_grasp() == True:
+                print("grasp succeed!")
+                
+                env.reset()
+                ee_position_ref = list(p.getLinkState(env.ur5, env.ee_tip)[4])
         
         
         if vrb.grasp == 1:

@@ -52,7 +52,7 @@ from absl import flags
 from ravens import tasks
 from ravens.dataset import Dataset
 from ravens.environments.environment import Environment
-import pybullet as p
+
 
 from pyquaternion import Quaternion
 
