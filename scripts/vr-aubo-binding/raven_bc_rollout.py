@@ -84,7 +84,8 @@ flags.DEFINE_string('mode', 'train', '')
 flags.DEFINE_integer('n', 1000, '')
 
 assets_root = "/home/robot/Downloads/ravens/ravens/environments/assets/"
-dataset_root = "/home/robot/temp/ravens_demo/"
+dataset_root = "/data/ravens_bc_rollout/"
+model_save_rootdir = "/data/trained_model/"
 #task_name = "place-red-in-green"
 task_name = "block-insertion-nofixture"
 mode = "train"
@@ -373,7 +374,7 @@ def main(unused_argv):
     obs = env.reset()
     info = None
     #agent = teleop_agent(env)
-    dataset = Dataset(os.path.join(dataset_root, f'ravens_demo-{time.time_ns()}'))
+    dataset = Dataset(os.path.join(dataset_root, f'ravens-bc-rollout-{time.time_ns()}'))
     seed = 0
 
     br = tf.TransformBroadcaster()
@@ -389,9 +390,11 @@ def main(unused_argv):
     img_draw = plt.imshow(im_depth, interpolation='nearest')
 
     agent = train_bc.BC_Agent()
-    agent.load_pretrained_model("model_1000_epoch")
+    agent.load_pretrained_model(model_save_rootdir + "model_500_epoch")
     agent.act(obs)
-
+    f = open(model_save_rootdir+ "rollout_log.txt","w+")
+    episode_steps = 0
+    n_episode = 1
     while not rospy.is_shutdown():
   
         #p.stepSimulation()
@@ -404,19 +407,45 @@ def main(unused_argv):
             obs = env.reset()
         
         action = agent.act(obs)
-        if action != None:
-            print(action)
+        #if action != None:
+        #    print(action)
     
-            #episode.append((obs, action, reward, info))
         
         obs, reward, done, info = env.step_simple(action)
-        im_depth = obs['depth'][0]
-        img_draw.set_data(im_depth)
-        plt.pause(0.00000001)
-        plt.show()
+        # im_depth = obs['depth'][0]
+        # img_draw.set_data(im_depth)
+        # plt.pause(0.00000001)
+        # plt.show()
         # print( im_color.shape)
 
         # print(obs['color'])
+        s = "Episode:%d, steps:%d"%(n_episode, episode_steps)
+        print(s)
+        if(done):
+            n_episode += 1
+            episode_steps = 0
+            s += ", succeed!\n" 
+            f.write(s)
+            f.flush()
+            seed += 1
+            dataset.add(seed, episode)
+            episode = []
+
+        else:
+            episode_steps += 1
+
+        if episode_steps > 100:
+            episode = []
+            episode_steps = 0
+            n_episode += 1
+
+            obs = env.reset()
+            s += ", failed!\n" 
+            f.write(s)
+            f.flush()
+        
+
+
         
 
         

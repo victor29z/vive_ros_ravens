@@ -19,9 +19,12 @@ from torch.autograd import Variable
 
 import torch.nn as nn
 from PIL import Image
+import torch.nn.functional as F
+from spatial_softmax import SpatialSoftmax
 
 assets_root = "/home/robot/Downloads/ravens/ravens/environments/assets/"
-dataset_root = "/home/robot/temp/ravens_demo/"
+dataset_root = "/data/ravens_demo/"
+model_save_rootdir = "/data/trained_model/"
 #task_name = "place-red-in-green"
 task_name = "block-insertion-nofixture"
 EPOCH = 3000
@@ -30,8 +33,8 @@ class CNNnet(torch.nn.Module):
     def __init__(self):
         super(CNNnet,self).__init__()
         self.conv1 = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=3,
-                            out_channels=64,
+            torch.nn.Conv2d(in_channels=4,
+                            out_channels=80,
                             kernel_size=7,
                             stride=2
                             ),
@@ -41,7 +44,7 @@ class CNNnet(torch.nn.Module):
         ).cuda()
         #self.conv1 = self.conv1.cuda()
         self.conv2 = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=64,
+            torch.nn.Conv2d(in_channels=80,
                             out_channels=32,
                             kernel_size=1
                             ),
@@ -67,11 +70,14 @@ class CNNnet(torch.nn.Module):
         self.mlp1 = torch.nn.Linear(73*53*32,100).cuda()
         self.mlp2 = torch.nn.Linear(100,50).cuda()
         self.mlp3 = torch.nn.Linear(50,8).cuda()
+
+        
     def forward(self, x):
         x = self.conv1(x)
         x = self.conv2(x)
         x = self.conv3(x)
         x = self.conv4(x)
+        
         x = self.mlp1(x.contiguous().view(x.size(0),-1))
         x = self.mlp2(x)
         x = self.mlp3(x)
@@ -181,21 +187,32 @@ class BC_Agent:
         self.model = CNNnet()
         print(self.model)
         self.opt = torch.optim.Adam(self.model.parameters(),lr = 0.001)
+        
         #self.loss_func = 0.7 * nn.L1Loss() + 0.3 * nn.MSELoss
-        self.loss_func = nn.MSELoss()
+        
 
     def load_pretrained_model(self,filename):
         self.model.load_state_dict(torch.load(filename))
         
 
-    def act(self, obs):
+    def act(self, obs, verbose = False):
         action = {}
-        picarray = obs['color'][0]
-        img = Image.fromarray(picarray).resize((160,120))
+        #resize picture to 160*120
+        color_array = obs['color'][0]
+        img = Image.fromarray(color_array).resize((160,120))
+        #img = img.astype(np.float32) / 255.
+        dep_array = obs['depth'][0]
+        img_depth = Image.fromarray(dep_array).resize((160,120))
+        # get array from resized image and normalization
+        color_array = np.asanyarray(img) / 255.0
+        dep_array = np.asanyarray(img_depth)
+        #expand depth map shape to (120*160*1)
+        tmp = np.expand_dims(dep_array,2)
+        # concatenate color and depth to (120*160*4)
+        rgbd_array = np.concatenate((color_array, tmp),2)
 
-        picarray = np.asanyarray(img)
         #x_tensor = torch.Tensor().cuda()
-        x_tensor = Variable(torch.Tensor(picarray).unsqueeze(0).cuda())
+        x_tensor = Variable(torch.Tensor(rgbd_array).unsqueeze(0).cuda())
         x_tensor = x_tensor.permute(0,3,1,2)
         output = self.model.forward(x_tensor)
         action_array = output.squeeze(0).cpu().detach().numpy()
@@ -208,8 +225,8 @@ class BC_Agent:
         
         action['pose'] = (p0,p1)
         action['grasp'] = g
-
-        print(action)
+        if verbose:
+            print(action)
         return action
 
 
@@ -219,9 +236,9 @@ class BC_Agent:
         
     def train_model(self,dataset):
         n_episodes = dataset.n_episodes
-        batch_size = 5
+        batch_size = 8
         num_batches = n_episodes // batch_size
-        f = open("loss.txt","w+")
+        f = open(model_save_rootdir+ "loss.txt","w+")
 
         for epoch in range(EPOCH):
             total_cost = 0
@@ -248,7 +265,8 @@ class BC_Agent:
                 #输入训练数据
                 output = self.model.forward(batch_x)
                 #计算误差
-                loss = self.loss_func(output, batch_y)
+                #loss = self.loss_func(output, batch_y)
+                loss = F.mse_loss(output,batch_y) + F.l1_loss(output,batch_y)
                 #清空上一次梯度
                 self.opt.zero_grad()
                 #误差反向传递
@@ -259,10 +277,10 @@ class BC_Agent:
             print("Epoch = {epoch}, cost = {le}".format(
                 epoch = epoch , le = total_cost / num_batches))
             f.write("%f\n"%(total_cost))
-            if epoch % 10 == 0:
+            if epoch % 100 == 0:
                 filename = "model_%d_epoch"%(epoch)
                 
-                torch.save(self.model.state_dict(), filename)
+                torch.save(self.model.state_dict(), model_save_rootdir + filename)
                 
 
 
@@ -283,12 +301,19 @@ class BC_Agent:
             episode_size = len(episode)
             for step in episode:
                 #resize picture to 160*120
-                picarray = step[0]['color'][0]
-                img = Image.fromarray(picarray).resize((160,120))
-
-                picarray = np.asanyarray(img)
-
-                s_set.append(picarray)
+                color_array = step[0]['color'][0]
+                img = Image.fromarray(color_array).resize((160,120))
+                #img = img.astype(np.float32) / 255.
+                dep_array = step[0]['depth'][0]
+                img_depth = Image.fromarray(dep_array).resize((160,120))
+                # get array from resized image and normalization
+                color_array = np.asanyarray(img) / 255.0
+                dep_array = np.asanyarray(img_depth)
+                #expand depth map shape to (120*160*1)
+                tmp = np.expand_dims(dep_array,2)
+                # concatenate color and depth to (120*160*4)
+                rgbd_array = np.concatenate((color_array, tmp),2)
+                s_set.append(rgbd_array)
                 p0 = np.array(step[1]['pose'][0])
                 p1 = np.array(step[1]['pose'][1])
                 g =  np.array(step[1]['grasp'])
@@ -334,7 +359,7 @@ class BC_Agent:
 
 def main():
 
-    train_dataset = Dataset(os.path.join(dataset_root, 'ravens_demo-1623319642194223290'))
+    train_dataset = Dataset(os.path.join(dataset_root, 'ravens_demo-1623740955852015910'))
     max_demos = train_dataset.n_episodes
 
     episodes = np.random.choice(range(max_demos), max_demos, False)
