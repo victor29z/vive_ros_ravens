@@ -81,8 +81,8 @@ class Environment(gym.Env):
         'depth': gym.spaces.Tuple(depth_tuple),
     })
     self.position_bounds = gym.spaces.Box(
-        low=np.array([0.25, -0.5, 0.], dtype=np.float32),
-        high=np.array([0.75, 0.5, 0.28], dtype=np.float32),
+        low=np.array([0.25, -0.5, 0.02], dtype=np.float32),
+        high=np.array([0.75, 0.5, 0.5], dtype=np.float32),
         shape=(3,),
         dtype=np.float32)
     self.action_space = gym.spaces.Dict({
@@ -216,15 +216,24 @@ class Environment(gym.Env):
             positionGains=gains)
       p.stepSimulation()
 
+  def get_aux_info(self, obj_id = 0):
+      aux = {}
+      ee_position_ref = list(p.getLinkState(self.ur5, self.ee_tip)[4])
+      ee_orientation = list(p.getLinkState(self.ur5, self.ee_tip)[5])
+      pos, rot = p.getBasePositionAndOrientation(obj_id)
+      aux['ee_pose'] = (tuple(ee_position_ref),tuple(ee_orientation))
+      aux['obj_pose'] =(pos, rot)
+      return aux
 
-  def step_simple(self, action = None):
+  def step_simple(self, action = None, use_aux = False, stand_still = False):
 
       if action != None:
           self.episode_steps += 1
           ee_pose = action['pose']
           grasp = action['grasp']
           self.joint_space_cmd = self.solve_ik(ee_pose)
-          self.movj_speed_control(self.joint_space_cmd)
+          if stand_still == False:
+            self.movj_speed_control(self.joint_space_cmd)
           #self.movej_fast(joint_position)
           #self.movep(ee_pose)
           if grasp == 1:
@@ -258,6 +267,9 @@ class Environment(gym.Env):
       p.stepSimulation()
     # Get task rewards.
       reward, info = self.task.reward() if action is not None else (0, {})
+      if use_aux:
+          aux = self.get_aux_info(5)
+
       done = self.task.done()
 
       if self.ee.check_grasp() == True:
@@ -271,7 +283,10 @@ class Environment(gym.Env):
 
       obs = self._get_obs()
       #obs = None
-      return obs, reward, done, info
+      if use_aux:
+          return obs, reward, done, info, aux
+      else:
+          return obs, reward, done, info
 
 
   def step(self, action=None):

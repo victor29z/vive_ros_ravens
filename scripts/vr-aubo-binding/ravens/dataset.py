@@ -36,12 +36,13 @@ TASK_NAMES = sorted(TASK_NAMES)[::-1]
 class Dataset:
   """A simple image dataset class."""
 
-  def __init__(self, path):
+  def __init__(self, path, use_aux = False):
     """A simple RGB-D image dataset."""
     self.path = path
     self.sample_set = []
     self.max_seed = -1
     self.n_episodes = 0
+    self.use_aux = use_aux
 
     # Track existing dataset if it exists.
     color_path = os.path.join(self.path, 'action')
@@ -62,12 +63,22 @@ class Dataset:
       episode: list of (obs, act, reward, info) tuples.
     """
     color, depth, action, reward, info = [], [], [], [], []
-    for obs, act, r, i in episode:
-      color.append(obs['color'])
-      depth.append(obs['depth'])
-      action.append(act)
-      reward.append(r)
-      info.append(i)
+    aux = []
+    if self.use_aux == False:
+      for obs, act, r, i in episode:
+        color.append(obs['color'])
+        depth.append(obs['depth'])
+        action.append(act)
+        reward.append(r)
+        info.append(i)
+    else:
+      for obs, act, r, i, a in episode:
+        color.append(obs['color'])
+        depth.append(obs['depth'])
+        action.append(act)
+        reward.append(r)
+        info.append(i)
+        aux.append(a)
 
     color = np.uint8(color)
     depth = np.float32(depth)
@@ -85,6 +96,8 @@ class Dataset:
     dump(action, 'action')
     dump(reward, 'reward')
     dump(info, 'info')
+    if self.use_aux:
+      dump(aux, 'aux')
 
     self.n_episodes += 1
     self.max_seed = max(self.max_seed, seed)
@@ -136,12 +149,18 @@ class Dataset:
         action = load_field(episode_id, 'action', fname)
         reward = load_field(episode_id, 'reward', fname)
         info = load_field(episode_id, 'info', fname)
+        if self.use_aux:
+          aux = load_field(episode_id, 'aux', fname)
+
 
         # Reconstruct episode.
         episode = []
         for i in range(len(action)):
           obs = {'color': color[i], 'depth': depth[i]} if images else {}
-          episode.append((obs, action[i], reward[i], info[i]))
+          if self.use_aux:
+            episode.append((obs, action[i], reward[i], info[i], aux[i]))
+          else:
+            episode.append((obs, action[i], reward[i], info[i]))
         return episode, seed
 
   def sample(self, images=True, cache=False):
@@ -167,3 +186,9 @@ class Dataset:
     i = np.random.choice(range(len(episode) - 1))
     sample, goal = episode[i], episode[-1]
     return sample, goal
+
+  def get_episode(self, episode_id, images=True, cache=False):
+
+    episode, _ = self.load(episode_id, images, cache)
+
+    return episode

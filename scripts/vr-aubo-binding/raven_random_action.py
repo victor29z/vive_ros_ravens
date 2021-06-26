@@ -66,6 +66,13 @@ import PyKDL as kdl
 
 from matplotlib import pyplot as plt
 
+import train_bc
+import torch
+from torch.utils import data
+from torch.autograd import Variable
+
+import torch.nn as nn
+
 
 
 flags.DEFINE_string('assets_root', '.', '')
@@ -77,7 +84,8 @@ flags.DEFINE_string('mode', 'train', '')
 flags.DEFINE_integer('n', 1000, '')
 
 assets_root = "/home/robot/Downloads/ravens/ravens/environments/assets/"
-dataset_root = "/data/ravens_demo/"
+dataset_root = "/data/ravens_bc_rollout/"
+model_save_rootdir = "/data/trained_model/"
 #task_name = "place-red-in-green"
 task_name = "block-insertion-nofixture"
 mode = "train"
@@ -280,11 +288,29 @@ class teleop_agent:
             return None
 
 
-
+class random_action_agent:
+    def __init__(self, env) -> None:
+        self.env = env
+        self.pose = ((0.0, 0.0, 0.0),(0.0, 0.0, 0.0, 1.0))
+        self.grasp = 0
+    def act(self):
+        action = {}
+        c = self.env.action_space.sample()
+        ee_position = c['pose'][0]
+        #ee_orientation = c['pose'][1]
+        ee_orientation = [0,0,0,1.0]
+        action['pose'] = (tuple(ee_position), tuple(ee_orientation))
+        action['grasp'] = 1
+        return action
         
-
         
-
+def get_state_ground_truth(env):
+    state = {}
+    ee_position_ref = list(p.getLinkState(env.ur5, env.ee_tip)[4])
+    obj_pos, obj_rot = p.getBasePositionAndOrientation(5)
+    state['ee_pose'] = tuple(ee_position_ref)
+    state['target_pose'] = (obj_pos,obj_rot)
+    return state
 
 def main(unused_argv):
     
@@ -314,10 +340,9 @@ def main(unused_argv):
     
     env.set_task(task)
     obs = env.reset()
-    aux = env.get_aux_info(5)
     info = None
-    agent = teleop_agent(env)
-    dataset = Dataset(os.path.join(dataset_root, f'ravens_demo-{time.time_ns()}'), use_aux = True)
+    #agent = teleop_agent(env)
+    dataset = Dataset(os.path.join(dataset_root, f'ravens-bc-rollout-{time.time_ns()}'))
     seed = 0
 
     br = tf.TransformBroadcaster()
@@ -329,57 +354,40 @@ def main(unused_argv):
 
     plt.ion()
     im_color = obs['color'][0]
-    img_draw = plt.imshow(im_color, interpolation='nearest')
+    im_depth = obs['depth'][0]
+    img_draw = plt.imshow(im_depth, interpolation='nearest')
 
+    agent = random_action_agent(env)
+    
+    f = open(model_save_rootdir+ "rollout_log.txt","w+")
+    episode_steps = 0
+    n_episode = 1
     while not rospy.is_shutdown():
   
         #p.stepSimulation()
         #p.getCameraImage(480, 320)
-        
         keys = p.getKeyboardEvents()
         if ord("r") in keys and keys[ord("r")] & p.KEY_WAS_RELEASED:
             print("reset env")
             episode = []
 
             obs = env.reset()
-
-
-
-        action = agent.act()
-        if action != None:
-            #print(action)
-            episode.append((obs, action, reward, info, aux))
         
-        obs, reward, done, info, aux = env.step_simple(action, use_aux = True)
-        #im_color = obs['color'][0]
-        #img_draw.set_data(im_color)
-        #plt.pause(0.00000001)
-        #plt.show()
-        #print( im_color.shape)
-
-        #print(obs['color'])
-
-        if done:
-            #print(episode)
-
-            # color= []
-            # for obs, _, _, _ in episode:
-            #     color = obs['color'][0]
-            #     color = np.uint8(color)
-            #     img_draw.set_data(color)
-            #     plt.pause(0.1)
-
-            
+        action = agent.act()
+        #if action != None:
+        #    print(action)
+        i = 30
+        while(i > 0):
+            obs, reward, done, info, aux = env.step_simple(action, use_aux = True)
+            i -=1
+        state = get_state_ground_truth(env)
+        print(state)
+        print(aux)
+        env.reset()
+        
 
 
-            seed += 1
-            dataset.add(seed, episode)
-            reward = 0
-            done = False
-            episode = []
-            np.random.seed(seed)
-            print("episode:{%d}"%seed)
-
+        
 
         
         rate.sleep()

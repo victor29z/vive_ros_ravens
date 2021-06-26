@@ -66,6 +66,14 @@ import PyKDL as kdl
 
 from matplotlib import pyplot as plt
 
+import bc_softmax2d_aux
+import bc_softmax_aux
+import torch
+from torch.utils import data
+from torch.autograd import Variable
+
+import torch.nn as nn
+
 
 
 flags.DEFINE_string('assets_root', '.', '')
@@ -77,7 +85,8 @@ flags.DEFINE_string('mode', 'train', '')
 flags.DEFINE_integer('n', 1000, '')
 
 assets_root = "/home/robot/Downloads/ravens/ravens/environments/assets/"
-dataset_root = "/data/ravens_demo/"
+dataset_root = "/data/ravens_bc_rollout/"
+model_save_rootdir = "/data/trained_model/"
 #task_name = "place-red-in-green"
 task_name = "block-insertion-nofixture"
 mode = "train"
@@ -281,9 +290,6 @@ class teleop_agent:
 
 
 
-        
-
-        
 
 
 def main(unused_argv):
@@ -314,10 +320,9 @@ def main(unused_argv):
     
     env.set_task(task)
     obs = env.reset()
-    aux = env.get_aux_info(5)
     info = None
-    agent = teleop_agent(env)
-    dataset = Dataset(os.path.join(dataset_root, f'ravens_demo-{time.time_ns()}'), use_aux = True)
+    #agent = teleop_agent(env)
+    dataset = Dataset(os.path.join(dataset_root, f'ravens-bc-rollout-{time.time_ns()}'))
     seed = 0
 
     br = tf.TransformBroadcaster()
@@ -329,57 +334,87 @@ def main(unused_argv):
 
     plt.ion()
     im_color = obs['color'][0]
-    img_draw = plt.imshow(im_color, interpolation='nearest')
+    im_depth = obs['depth'][0]
+    img_draw = plt.imshow(im_depth, interpolation='nearest')
 
+    agent = bc_softmax_aux.BC_Agent()
+    #agent = bc_softmax2d_aux.BC_Agent()
+    agent.load_pretrained_model(model_save_rootdir + "model_8200_epoch")
+    agent.act(obs)
+    f = open(model_save_rootdir+ "rollout_log.txt","w+")
+    episode_steps = 0
+    n_episode = 1
+    aux= {
+        'ee_pose': ((0,0,0),(0,0,0,1)),
+        'obj_pose': ((0,0,0),(0,0,0,1))
+    }
     while not rospy.is_shutdown():
   
         #p.stepSimulation()
         #p.getCameraImage(480, 320)
-        
         keys = p.getKeyboardEvents()
         if ord("r") in keys and keys[ord("r")] & p.KEY_WAS_RELEASED:
             print("reset env")
             episode = []
+            episode_steps = 0
+            n_episode += 1
 
             obs = env.reset()
-
-
-
-        action = agent.act()
-        if action != None:
-            #print(action)
-            episode.append((obs, action, reward, info, aux))
         
-        obs, reward, done, info, aux = env.step_simple(action, use_aux = True)
-        #im_color = obs['color'][0]
-        #img_draw.set_data(im_color)
-        #plt.pause(0.00000001)
-        #plt.show()
-        #print( im_color.shape)
+        action, predicted_aux = agent.act(obs, ret_aux= True)
+        #if action != None:
+        #    print(action)
+        obj_pose = predicted_aux['predicted_obj_pose']
+        #obj_pose = predicted_aux['predicted_ee_position']
+        #obj_pose = aux['ee_pose']
+        marker_head_point = [obj_pose[0], obj_pose[1], obj_pose[2]]
+        marker_tail_point = [obj_pose[0], obj_pose[1], obj_pose[2]+0.01]
+        p.addUserDebugLine(marker_head_point,
+                            marker_tail_point,
+                            lineColorRGB=[0, 1, 0],
+                            lifeTime=0.2,
+                            lineWidth=5)
+    
+        
+        #obs, reward, done, info, aux = env.step_simple(action,use_aux = True, stand_still = True)
+        obs, reward, done, info, aux = env.step_simple(action,use_aux = True)
+        print(aux)
+        print(predicted_aux)
+        # im_depth = obs['depth'][0]
+        # img_draw.set_data(im_depth)
+        # plt.pause(0.00000001)
+        # plt.show()
+        # print( im_color.shape)
 
-        #print(obs['color'])
-
-        if done:
-            #print(episode)
-
-            # color= []
-            # for obs, _, _, _ in episode:
-            #     color = obs['color'][0]
-            #     color = np.uint8(color)
-            #     img_draw.set_data(color)
-            #     plt.pause(0.1)
-
-            
-
-
+        # print(obs['color'])
+        s = "Episode:%d, steps:%d"%(n_episode, episode_steps)
+        print(s)
+        if(done):
+            n_episode += 1
+            episode_steps = 0
+            s += ", succeed!\n" 
+            f.write(s)
+            f.flush()
             seed += 1
             dataset.add(seed, episode)
-            reward = 0
-            done = False
             episode = []
-            np.random.seed(seed)
-            print("episode:{%d}"%seed)
 
+        else:
+            episode_steps += 1
+
+        if episode_steps > 100:
+            episode = []
+            episode_steps = 0
+            n_episode += 1
+
+            obs = env.reset()
+            s += ", failed!\n" 
+            f.write(s)
+            f.flush()
+        
+
+
+        
 
         
         rate.sleep()

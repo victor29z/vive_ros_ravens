@@ -85,7 +85,7 @@ flags.DEFINE_integer('n', 1000, '')
 
 assets_root = "/home/robot/Downloads/ravens/ravens/environments/assets/"
 dataset_root = "/data/ravens_bc_rollout/"
-model_save_rootdir = "/data/trained_model/"
+model_save_rootdir = "/data/trained_model/plain_bc_model/"
 #task_name = "place-red-in-green"
 task_name = "block-insertion-nofixture"
 mode = "train"
@@ -290,56 +290,56 @@ class teleop_agent:
 
 
         
-class CNNnet(torch.nn.Module):
-    def __init__(self):
-        super(CNNnet,self).__init__()
-        self.conv1 = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=3,
-                            out_channels=64,
-                            kernel_size=7,
-                            stride=2
-                            ),
-            #torch.nn.BatchNorm2d(16),
-            torch.nn.ReLU()
-            #torch.nn.MaxPool2d(kernel_size = 2)
-        ).cuda()
-        #self.conv1 = self.conv1.cuda()
-        self.conv2 = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=64,
-                            out_channels=32,
-                            kernel_size=1
-                            ),
+# class CNNnet(torch.nn.Module):
+#     def __init__(self):
+#         super(CNNnet,self).__init__()
+#         self.conv1 = torch.nn.Sequential(
+#             torch.nn.Conv2d(in_channels=3,
+#                             out_channels=64,
+#                             kernel_size=7,
+#                             stride=2
+#                             ),
+#             #torch.nn.BatchNorm2d(16),
+#             torch.nn.ReLU()
+#             #torch.nn.MaxPool2d(kernel_size = 2)
+#         ).cuda()
+#         #self.conv1 = self.conv1.cuda()
+#         self.conv2 = torch.nn.Sequential(
+#             torch.nn.Conv2d(in_channels=64,
+#                             out_channels=32,
+#                             kernel_size=1
+#                             ),
 
-            torch.nn.ReLU()
-        ).cuda()
-        self.conv3 = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=32,
-                            out_channels=32,
-                            kernel_size=3
-                            ),
+#             torch.nn.ReLU()
+#         ).cuda()
+#         self.conv3 = torch.nn.Sequential(
+#             torch.nn.Conv2d(in_channels=32,
+#                             out_channels=32,
+#                             kernel_size=3
+#                             ),
 
-            torch.nn.ReLU()
-        ).cuda()
-        self.conv4 = torch.nn.Sequential(
-            torch.nn.Conv2d(in_channels=32,
-                            out_channels=32,
-                            kernel_size=3
-                            ),
+#             torch.nn.ReLU()
+#         ).cuda()
+#         self.conv4 = torch.nn.Sequential(
+#             torch.nn.Conv2d(in_channels=32,
+#                             out_channels=32,
+#                             kernel_size=3
+#                             ),
 
-            torch.nn.ReLU()
-        ).cuda()
-        self.mlp1 = torch.nn.Linear(73*53*32,100).cuda()
-        self.mlp2 = torch.nn.Linear(100,50).cuda()
-        self.mlp3 = torch.nn.Linear(50,8).cuda()
-    def forward(self, x):
-        x = self.conv1(x)
-        x = self.conv2(x)
-        x = self.conv3(x)
-        x = self.conv4(x)
-        x = self.mlp1(x.contiguous().view(x.size(0),-1))
-        x = self.mlp2(x)
-        x = self.mlp3(x)
-        return x
+#             torch.nn.ReLU()
+#         ).cuda()
+#         self.mlp1 = torch.nn.Linear(73*53*32,100).cuda()
+#         self.mlp2 = torch.nn.Linear(100,50).cuda()
+#         self.mlp3 = torch.nn.Linear(50,8).cuda()
+#     def forward(self, x):
+#         x = self.conv1(x)
+#         x = self.conv2(x)
+#         x = self.conv3(x)
+#         x = self.conv4(x)
+#         x = self.mlp1(x.contiguous().view(x.size(0),-1))
+#         x = self.mlp2(x)
+#         x = self.mlp3(x)
+#         return x
 
         
 
@@ -403,7 +403,7 @@ def main(unused_argv):
         if ord("r") in keys and keys[ord("r")] & p.KEY_WAS_RELEASED:
             print("reset env")
             episode = []
-
+            episode_steps = 0
             obs = env.reset()
         
         action = agent.act(obs)
@@ -412,10 +412,10 @@ def main(unused_argv):
     
         
         obs, reward, done, info = env.step_simple(action)
-        # im_depth = obs['depth'][0]
-        # img_draw.set_data(im_depth)
-        # plt.pause(0.00000001)
-        # plt.show()
+        im_depth = obs['depth'][0]
+        img_draw.set_data(im_depth)
+        plt.pause(0.00000001)
+        plt.show()
         # print( im_color.shape)
 
         # print(obs['color'])

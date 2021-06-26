@@ -58,7 +58,8 @@ class ViveRobotBridge:
     def __init__(self):
         self.offset = [0,0,0]
         self.offset_flag = 0
-        
+        self.grasp = 0
+
         self.trigger_pressed_event = 0
         self.trigger_released_event = 0
         self.trigger_current_status = 0
@@ -73,6 +74,7 @@ class ViveRobotBridge:
 #        print("starting thread")
 #        self.tf_thread.start()
 
+
     def vive_controller_button_callback(self, msg):
         
         if msg.buttons[1] == 1:
@@ -86,6 +88,11 @@ class ViveRobotBridge:
             self.trigger_current_status = 0
         # save last status
         self.trigger_last_status = msg.buttons[1]
+
+        if msg.buttons[2] == 1:
+            self.grasp = 1
+        else:
+            self.grasp = 0
         
     def publish(self, msg):
         self.pub.publish(msg)
@@ -161,62 +168,5 @@ if __name__ == '__main__':
             
             vrb.pub.publish(msg)
         rate.sleep()
-        """
-        if vrb.offset_flag == 1:
-            if temp_flag == 0:
 
-                pre_position[0]=trans.transform.translation.x
-                pre_position[1]=trans.transform.translation.y
-                pre_position[2]=trans.transform.translation.z
-                
-                pre_pose[0] = trans.transform.rotation.x
-                pre_pose[1] = trans.transform.rotation.y
-                pre_pose[2] = trans.transform.rotation.z
-                pre_pose[3] = trans.transform.rotation.w
-            else:
-                msg = geometry_msgs.msg.Transform()            
-
-#                compute delta distance
-                msg.translation.x = trans.transform.translation.x-pre_position[0]
-                msg.translation.y = trans.transform.translation.y-pre_position[1]
-                msg.translation.z = trans.transform.translation.z-pre_position[2]
-                
-
-                                        
-                if msg.translation.x >limits:
-                    msg.translation.x = limits                
-                if msg.translation.y >limits:
-                    msg.translation.y = limits                
-                if msg.translation.z >limits:
-                    msg.translation.z = limits                     
-                if msg.translation.x <-limits:
-                    msg.translation.x = -limits                
-                if msg.translation.y <-limits:
-                    msg.translation.y = -limits                
-                if msg.translation.z <-limits:
-                    msg.translation.z = -limits
-                
-                print(msg.translation)
-                
-                msg.rotation.x = trans.transform.rotation.x
-                msg.rotation.y = trans.transform.rotation.y
-                msg.rotation.z = trans.transform.rotation.z
-                msg.rotation.w = trans.transform.rotation.w
-                
-
-                print(msg.rotation)
-                
-                vrb.pub.publish(msg)
-                
-                pre_position[0]=trans.transform.translation.x
-                pre_position[1]=trans.transform.translation.y
-                pre_position[2]=trans.transform.translation.z
-            
-
-        temp_flag = vrb.offset_flag
-       
-        rate.sleep()
-         """
-
-        
 #    
